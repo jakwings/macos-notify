@@ -1,0 +1,28 @@
+#!/bin/sh
+
+set -euf; unset -v IFS; export LC_ALL=C
+
+CFLAGS="-fobjc-arc -O2 -Wall -Wextra -pedantic"
+LDFLAGS="-framework Foundation -framework AppKit"
+
+OS_VERSION="$(uname -r)"
+OS_VERSION="$(( ${OS_VERSION%%.*} - 4 ))"
+
+if false && [ 14 -le "${OS_VERSION}" ]; then
+  LDFLAGS="${LDFLAGS} -framework UserNotifications"
+  BIN=./notify SRC=./main2.m
+else
+  CFLAGS="${CFLAGS} -Wno-deprecated-declarations"
+  BIN=./notify SRC=./main.m
+fi
+# otool -P "${BIN}"
+CFLAGS="${CFLAGS} -Wl,-sectcreate,__TEXT,__info_plist,Info.plist"
+
+# shellcheck disable=SC3013
+if ! [ -e "${BIN}" ] || [ "${BIN}" -ot "${SRC}" ] || [ "${BIN}" -ot "$0" ]; then
+  xcrun clang -v $CFLAGS $LDFLAGS -o "${BIN}" "${SRC}"
+  [ x"$(cat Info.plist)" = x"$(otool -XP "${BIN}")" ]  # rtrim '\n'
+  "${BIN}" -title notify -body 'Compilation done!' -timeout 10 &
+else
+  printf '%s\n' 'There are no changes since last compilation.'
+fi
